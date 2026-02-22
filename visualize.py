@@ -33,7 +33,6 @@ for p_id, data in trajectories.items():
 plt.title("N-Body Dynamic Universe (3-Body System)")
 plt.xlabel("X Position (m)")
 plt.ylabel("Y Position (m)")
-plt.legend()
 plt.grid(True)
 plt.axis('equal')
 

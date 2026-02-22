@@ -278,8 +278,8 @@ int main() {
 
   std::vector<Particle> universe;
 
-  // Generate 1000 planets
-  for (int i = 0; i < 1000; i++) {
+  // Generate 100 planets
+  for (int i = 0; i < 100; i++) {
     Particle planet;
     double randomPositionX = randomDouble(-200000000.0, 200000000.0);
     double randomPositionY = randomDouble(-200000000.0, 200000000.0);
