@@ -20,6 +20,18 @@ struct BoundingBox {
   double x;
   double y;
   double halfDimension;
+
+  bool contains(Particle* p) {
+    double rightBoundary = x + halfDimension;
+    double leftBoundary = x - halfDimension;
+    double topBoundary = y + halfDimension;
+    double bottomBoundary = y - halfDimension;
+
+    if (p->position.x >= leftBoundary && p->position.x < rightBoundary && p->position.y >= bottomBoundary && p->position.y < topBoundary) {
+      return true;
+    }
+    return false;
+  }
 };
 
 struct QuadtreeNode {
@@ -43,7 +55,6 @@ struct QuadtreeNode {
     northWest = nullptr; northEast = nullptr;
     southWest = nullptr; southEast = nullptr;
   }
-
 
   void subdivide() {
     // We cut the size of the box in half for the children
