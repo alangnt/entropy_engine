@@ -2,6 +2,8 @@
 #include <cmath>
 #include <fstream>
 #include <vector>
+#include <cstdlib>
+#include <ctime>
 
 struct Vector3 {
   double x;
@@ -168,6 +170,9 @@ const double DT = 1.0;
 // Theta (MAC ratio)
 const double THETA = 0.5;
 
+// Softening parameter
+const double EPSILON = 100000.0;
+
 double calculateDistance(const Vector3& pA, const Vector3& pB) {
   double dx = pB.x - pA.x;
   double dy = pB.y - pA.y;
@@ -198,8 +203,10 @@ Vector3 calculateGravitationalForceVector(const Particle& pA, const Particle& pB
     return zeroForce;
   }
 
+  double epsilonSquared = EPSILON * EPSILON;
+
   // 4. Newton's Formula (F = G * (m1 * m2) / r^2)
-  double force = GRAVITATIONAL_CONSTANT * (pA.mass * pB.mass) / distanceSquared;
+  double force = GRAVITATIONAL_CONSTANT * (pA.mass * pB.mass) / (distanceSquared + epsilonSquared);
 
   // 5. Find distance between pA and pB
   double distance = std::sqrt(distanceSquared);
@@ -260,29 +267,30 @@ Vector3 calculateTreeForce(Particle* p, QuadtreeNode* node) {
   return totalForce;
 }
 
+double randomDouble(double min, double max) {
+  double fraction = (double)rand() / RAND_MAX;
+
+  return min + fraction * (max - min);
+}
+
 int main() {
+  srand(time(NULL));
+
   std::vector<Particle> universe;
 
-  // Earth
-  Particle earth;
-  earth.position.x = 0.0; earth.position.y = 0.0; earth.position.z = 0.0;
-  earth.velocity.x = 0.0; earth.velocity.y = 0.0; earth.velocity.z = 0.0;
-  earth.mass = 5.972e24;
-  universe.push_back(earth);
+  // Generate 1000 planets
+  for (int i = 0; i < 1000; i++) {
+    Particle planet;
+    double randomPositionX = randomDouble(-200000000.0, 200000000.0);
+    double randomPositionY = randomDouble(-200000000.0, 200000000.0);
 
-  // Moon
-  Particle moon;
-  moon.position.x = 384400000.0; moon.position.y = 0.0; moon.position.z = 0.0;
-  moon.velocity.x = 0.0; moon.velocity.y = 1022.0; moon.velocity.z = 0.0;
-  moon.mass = 7.34767309e22;
-  universe.push_back(moon);
+    planet.position.x = randomPositionX; planet.position.y = randomPositionY;
+    planet.position.z = 0.0;
+    planet.mass = 5.972e24;
+    planet.velocity.x = 0.0; planet.velocity.y = 0.0; planet.velocity.z = 0.0;
 
-  // LEO Satellite
-  Particle satellite;
-  satellite.position.x = 6771000.0; satellite.position.y = 0.0; satellite.position.z = 0.0;
-  satellite.velocity.x = 0.0; satellite.velocity.y = 7660.0; satellite.velocity.z = 0.0;
-  satellite.mass = 420.0;
-  universe.push_back(satellite);
+    universe.push_back(planet);
+  }
 
   std::ofstream trajectoryFile("orbit.csv");
   trajectoryFile << "Step,X,Y,Z\n";
@@ -331,7 +339,7 @@ int main() {
     }
 
     // Print the position every hour of the simulation time
-    if (step % 60 == 0) {
+    if (step % 3600 == 0) {
       for (int i = 0; i < universe.size(); i++) {
         trajectoryFile << step << "," 
           << i << "," // 'i' is the ParticleID (0 for Earth, 1 for Moon)
