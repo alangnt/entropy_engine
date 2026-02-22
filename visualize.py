@@ -1,42 +1,36 @@
-import csv
+import pandas as pd
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 
-trajectories = {}
+print("Loading universe data...")
+df = pd.read_csv('orbit.csv')
+df_unique_steps = df['Step'].unique()
+print(f"Loaded {len(df_unique_steps)} frames of animation.")
 
-with open('orbit.csv', 'r') as file:
-  reader = csv.reader(file)
-  next(reader)
+fig = plt.figure(figsize=(10, 10))
+ax = fig.add_subplot(111, projection='3d')
 
-  for row in reader:
-    p_id = int(row[1])
-    x = float(row[2])
-    y = float(row[3])
+bound = 200000000.0
+ax.set_xlim([-bound, bound])
+ax.set_ylim([-bound, bound])
+ax.set_zlim([-bound, bound])
 
-    if p_id not in trajectories:
-      trajectories[p_id] = {'x': [], 'y': []}
+ax.set_facecolor('black')
+fig.patch.set_facecolor('black')
+ax.grid(False)
+ax.axis('off')
 
-    trajectories[p_id]['x'].append(x)
-    trajectories[p_id]['y'].append(y)
+scatter = ax.scatter([], [], [], c='white', marker='o', s=1.5)
 
-plt.figure(figsize=(10, 10))
-
-labels = {0: "Earth", 1: "Moon", 2: "Low Earth Orbit Satellite"}
-colors = {0: "green", 1: "blue", 2: "red"}
-
-for p_id, data in trajectories.items():
+def update(frame_index):
+    current_step = df_unique_steps[frame_index]
+    filtered_df = df[df['Step'] == current_step]
     
-    name = labels.get(p_id, f"Unknown Particle {p_id}")
-    color = colors.get(p_id, "black")
-    
-    plt.plot(data['x'], data['y'], label=name, color=color)
+    scatter._offsets3d = (filtered_df['X'], filtered_df['Y'], filtered_df['Z'])
+    return scatter,
 
-plt.title("N-Body Dynamic Universe (3-Body System)")
-plt.xlabel("X Position (m)")
-plt.ylabel("Y Position (m)")
-plt.grid(True)
-plt.axis('equal')
-
-plt.xlim(-10000000, 10000000)
-plt.ylim(-10000000, 10000000)
+print("Starting simulation playback...")
+# interval=30 means 30 milliseconds between frame
+ani = animation.FuncAnimation(fig, update, frames=len(df_unique_steps), interval=30, blit=False)
 
 plt.show()

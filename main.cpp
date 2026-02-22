@@ -5,6 +5,18 @@
 #include <cstdlib>
 #include <ctime>
 
+// Define G as a constant double
+const double GRAVITATIONAL_CONSTANT = 6.67430e-11;
+
+// Define dt as a constant double
+const double DT = 1.0;
+
+// Theta (MAC ratio)
+const double THETA = 0.5;
+
+// Softening parameter
+const double EPSILON = 100000.0;
+
 struct Vector3 {
   double x;
   double y;
@@ -21,6 +33,7 @@ struct Particle {
 struct BoundingBox {
   double x;
   double y;
+  double z;
   double halfDimension;
 
   bool contains(Particle* p) {
@@ -28,48 +41,63 @@ struct BoundingBox {
     double leftBoundary = x - halfDimension;
     double topBoundary = y + halfDimension;
     double bottomBoundary = y - halfDimension;
+    double frontBoundary = z + halfDimension;
+    double backBoundary = z - halfDimension;
 
-    if (p->position.x >= leftBoundary && p->position.x < rightBoundary && p->position.y >= bottomBoundary && p->position.y < topBoundary) {
+    if (p->position.x >= leftBoundary && p->position.x < rightBoundary 
+      && p->position.y >= bottomBoundary && p->position.y < topBoundary
+      && p->position.z >= backBoundary && p->position.z < frontBoundary) {
       return true;
     }
     return false;
   }
 };
 
-struct QuadtreeNode {
+struct OctreeNode {
   BoundingBox boundary;
   Particle* particle;
-  
+
   double totalMass;
   Vector3 centerOfMass;
 
-  QuadtreeNode* northWest;
-  QuadtreeNode* northEast;
-  QuadtreeNode* southWest;
-  QuadtreeNode* southEast;
+  OctreeNode* topNorthWest; OctreeNode* bottomNorthWest;
+  OctreeNode* topNorthEast; OctreeNode* bottomNorthEast;
+  OctreeNode* topSouthWest; OctreeNode* bottomSouthWest;
+  OctreeNode* topSouthEast; OctreeNode* bottomSouthEast;
 
-  QuadtreeNode(BoundingBox b) {
+  OctreeNode(BoundingBox b) {
     boundary = b;
     particle = nullptr;
     totalMass = 0.0;
     centerOfMass.x = 0.0; centerOfMass.y = 0.0; centerOfMass.z = 0.0;
 
-    northWest = nullptr; northEast = nullptr;
-    southWest = nullptr; southEast = nullptr;
+    topNorthWest = nullptr; topNorthEast = nullptr;
+    topSouthWest = nullptr; topSouthEast = nullptr;
+    bottomNorthWest = nullptr; bottomNorthEast = nullptr;
+    bottomSouthWest = nullptr; bottomSouthEast = nullptr;
   }
 
   void free() {
-    if (northWest != nullptr) {
-      northWest->free();
-      northEast->free();
-      southWest->free();
-      southEast->free();
+    if (topNorthWest != nullptr) {
+      topNorthWest->free(); topNorthEast->free();
+      topSouthWest->free(); topSouthEast->free();
+      bottomNorthWest->free(); bottomNorthEast->free();
+      bottomSouthWest->free(); bottomSouthEast->free();
     }
 
-    delete northWest;
-    delete northEast;
-    delete southWest;
-    delete southEast;
+    delete topNorthWest; delete topNorthEast;
+    delete topSouthWest; delete topSouthEast;
+    delete bottomNorthWest; delete bottomNorthEast;
+    delete bottomSouthWest; delete bottomSouthEast;
+  }
+
+  void update(Particle* p) {
+    // Insert the new particle and calculate new center of mass and total mass
+    centerOfMass.x = ((totalMass * centerOfMass.x) + (p->mass * p->position.x)) / (totalMass + p->mass);
+    centerOfMass.y = ((totalMass * centerOfMass.y) + (p->mass * p->position.y)) / (totalMass + p->mass);
+    centerOfMass.z = ((totalMass * centerOfMass.z) + (p->mass * p->position.z)) / (totalMass + p->mass);
+
+    totalMass = totalMass + p->mass;
   }
 
   bool insert(Particle* p) {
@@ -83,95 +111,83 @@ struct QuadtreeNode {
     update(p);
 
     // 3. We check if no children and no particle first
-    if (northWest == nullptr && particle == nullptr) {
+    if (topNorthWest == nullptr && particle == nullptr) {
       particle = p;
       return true;
     }
 
     // 4. We check if no children and particle and push the old particle down
-    if (northWest == nullptr && particle != nullptr) {
+    if (topNorthWest == nullptr && particle != nullptr) {
       subdivide();
-      if (northWest->insert(particle)) { /* Success, do nothing else */ }
-      else if (northEast->insert(particle)) { }
-      else if (southWest->insert(particle)) { }
-      else if (southEast->insert(particle)) { }
+      if (topNorthWest->insert(particle)) { /* Success, do nothing else */ }
+      else if (topNorthEast->insert(particle)) { }
+      else if (topSouthWest->insert(particle)) { }
+      else if (topSouthEast->insert(particle)) { }
+      else if (bottomNorthWest->insert(particle)) { }
+      else if (bottomNorthEast->insert(particle)) { }
+      else if (bottomSouthWest->insert(particle)) { }
+      else if (bottomSouthEast->insert(particle)) { }
       particle = nullptr;
     }
 
     // 5. Push the new particle down
-    if (northWest->insert(p)) {
-      return true;
-    }
-    if (northEast->insert(p)) {
-      return true;
-    }
-    if (southWest->insert(p)) {
-      return true;
-    }
-    if (southEast->insert(p)) {
-      return true;
-    }
-
-    if (p == particle) {}
+    if (topNorthWest->insert(p)) return true;
+    if (topNorthEast->insert(p)) return true;
+    if (topSouthWest->insert(p)) return true;
+    if (topSouthEast->insert(p)) return true;
+    if (bottomNorthWest->insert(p)) return true;
+    if (bottomNorthEast->insert(p)) return true;
+    if (bottomSouthWest->insert(p)) return true;
+    if (bottomSouthEast->insert(p)) return true;
 
     return false;
-  }
-
-  void update(Particle* p) {
-    // Insert the new particle and calculate new center of mass and total mass
-    centerOfMass.x = ((totalMass * centerOfMass.x) + (p->mass * p->position.x)) / (totalMass + p->mass);
-    centerOfMass.y = ((totalMass * centerOfMass.y) + (p->mass * p->position.y)) / (totalMass + p->mass);
-    centerOfMass.z = ((totalMass * centerOfMass.z) + (p->mass * p->position.z)) / (totalMass + p->mass);
-
-    totalMass = totalMass + p->mass;
   }
 
   void subdivide() {
     // We cut the size of the box in half for the children
     double newHalf = boundary.halfDimension / 2.0;
 
-    // 1. Create the NorthWest box
-    BoundingBox nwBoundary;
-    nwBoundary.x = boundary.x - newHalf; // Move Left
-    nwBoundary.y = boundary.y + newHalf; // Move Up
-    nwBoundary.halfDimension = newHalf;
-    // Claim the RAM on the Heap!
-    northWest = new QuadtreeNode(nwBoundary);
+    BoundingBox tnw;
+    tnw.x = boundary.x - newHalf; tnw.y = boundary.y + newHalf; tnw.z = boundary.z + newHalf;
+    tnw.halfDimension = newHalf;
+    topNorthWest = new OctreeNode(tnw);
 
-    // 2. Create the NorthEast box
-    BoundingBox neBoundary;
-    neBoundary.x = boundary.x + newHalf; // Move Right
-    neBoundary.y = boundary.y + newHalf; // Move Up
-    neBoundary.halfDimension = newHalf;
-    northEast = new QuadtreeNode(neBoundary);
+    BoundingBox tne;
+    tne.x = boundary.x + newHalf; tne.y = boundary.y + newHalf; tne.z = boundary.z + newHalf;
+    tne.halfDimension = newHalf;
+    topNorthEast = new OctreeNode(tne);
 
-    // 3. Create the SouthWest box
-    BoundingBox swBoundary;
-    swBoundary.x = boundary.x - newHalf; // Move Left
-    swBoundary.y = boundary.y - newHalf; // Move Down
-    swBoundary.halfDimension = newHalf;
-    southWest = new QuadtreeNode(swBoundary);
+    BoundingBox tsw;
+    tsw.x = boundary.x - newHalf; tsw.y = boundary.y - newHalf; tsw.z = boundary.z + newHalf;
+    tsw.halfDimension = newHalf;
+    topSouthWest = new OctreeNode(tsw);
 
-    // 4. Create the SouthEast box
-    BoundingBox seBoundary;
-    seBoundary.x = boundary.x + newHalf; // Move Right
-    seBoundary.y = boundary.y - newHalf; // Move Down
-    seBoundary.halfDimension = newHalf;
-    southEast = new QuadtreeNode(seBoundary);
+    BoundingBox tse;
+    tse.x = boundary.x + newHalf; tse.y = boundary.y - newHalf; tse.z = boundary.z + newHalf;
+    tse.halfDimension = newHalf;
+    topSouthEast = new OctreeNode(tse);
+
+    BoundingBox bnw;
+    bnw.x = boundary.x - newHalf; bnw.y = boundary.y + newHalf; bnw.z = boundary.z - newHalf;
+    bnw.halfDimension = newHalf;
+    bottomNorthWest = new OctreeNode(bnw);
+
+    BoundingBox bne;
+    bne.x = boundary.x + newHalf; bne.y = boundary.y + newHalf; bne.z = boundary.z - newHalf;
+    bne.halfDimension = newHalf;
+    bottomNorthEast = new OctreeNode(bne);
+
+    BoundingBox bsw;
+    bsw.x = boundary.x - newHalf; bsw.y = boundary.y - newHalf; bsw.z = boundary.z - newHalf;
+    bsw.halfDimension = newHalf;
+    bottomSouthWest = new OctreeNode(bsw);
+
+    BoundingBox bse;
+    bse.x = boundary.x + newHalf; bse.y = boundary.y - newHalf; bse.z = boundary.z - newHalf;
+    bse.halfDimension = newHalf;
+    bottomSouthEast = new OctreeNode(bse);
   }
 };
-
-// Define G as a constant double
-const double GRAVITATIONAL_CONSTANT = 6.67430e-11;
-
-// Define dt as a constant double
-const double DT = 1.0;
-
-// Theta (MAC ratio)
-const double THETA = 0.5;
-
-// Softening parameter
-const double EPSILON = 100000.0;
 
 double calculateDistance(const Vector3& pA, const Vector3& pB) {
   double dx = pB.x - pA.x;
@@ -220,21 +236,21 @@ Vector3 calculateGravitationalForceVector(const Particle& pA, const Particle& pB
   return forceVector;
 }
 
-Vector3 calculateTreeForce(Particle* p, QuadtreeNode* node) {
+Vector3 calculateTreeForce(Particle* p, OctreeNode* node) {
   Vector3 totalForce = {0.0, 0.0, 0.0};
 
   if (node->totalMass == 0.0) {
     return totalForce;
   }
 
-  if (node->northWest == nullptr && node->particle != nullptr) {
+  if (node->topNorthWest == nullptr && node->particle != nullptr) {
     if (p == node->particle) {
       return totalForce;
     }
     return calculateGravitationalForceVector(*p, *(node->particle));
   }
 
-  if (node->northWest != nullptr) {
+  if (node->topNorthWest != nullptr) {
     // find d
     double distance = calculateDistance(p->position, node->centerOfMass);
 
@@ -251,14 +267,18 @@ Vector3 calculateTreeForce(Particle* p, QuadtreeNode* node) {
 
       totalForce = force;
     } else {
-      Vector3 nwForce = calculateTreeForce(p, node->northWest);
-      Vector3 neForce = calculateTreeForce(p, node->northEast);
-      Vector3 swForce = calculateTreeForce(p, node->southWest);
-      Vector3 seForce = calculateTreeForce(p, node->southEast);
+      Vector3 tnwForce = calculateTreeForce(p, node->topNorthWest);
+      Vector3 tneForce = calculateTreeForce(p, node->topNorthEast);
+      Vector3 tswForce = calculateTreeForce(p, node->topSouthWest);
+      Vector3 tseForce = calculateTreeForce(p, node->topSouthEast);
+      Vector3 bnwForce = calculateTreeForce(p, node->bottomNorthWest);
+      Vector3 bneForce = calculateTreeForce(p, node->bottomNorthEast);
+      Vector3 bswForce = calculateTreeForce(p, node->bottomSouthWest);
+      Vector3 bseForce = calculateTreeForce(p, node->bottomSouthEast);
 
-      double totalForceX = nwForce.x + neForce.x + swForce.x + seForce.x;
-      double totalForceY = nwForce.y + neForce.y + swForce.y + seForce.y;
-      double totalForceZ = nwForce.z + neForce.z + swForce.z + seForce.z;
+      double totalForceX = tnwForce.x + tneForce.x + tswForce.x + tseForce.x + bnwForce.x + bneForce.x + bswForce.x + bseForce.x;
+      double totalForceY = tnwForce.y + tneForce.y + tswForce.y + tseForce.y + bnwForce.y + bneForce.y + bswForce.y + bseForce.y;
+      double totalForceZ = tnwForce.z + tneForce.z + tswForce.z + tseForce.z + bnwForce.z + bneForce.z + bswForce.z + bseForce.z;
 
       totalForce = {totalForceX, totalForceY, totalForceZ};
     }
@@ -278,14 +298,16 @@ int main() {
 
   std::vector<Particle> universe;
 
-  // Generate 100 planets
-  for (int i = 0; i < 100; i++) {
+  // Generate 1000 planets
+  for (int i = 0; i < 1000; i++) {
     Particle planet;
     double randomPositionX = randomDouble(-200000000.0, 200000000.0);
     double randomPositionY = randomDouble(-200000000.0, 200000000.0);
+    double randomPositionZ = randomDouble(-200000000.0, 200000000.0);
 
-    planet.position.x = randomPositionX; planet.position.y = randomPositionY;
-    planet.position.z = 0.0;
+    planet.position.x = randomPositionX; 
+    planet.position.y = randomPositionY;
+    planet.position.z = randomPositionZ;
     planet.mass = 5.972e24;
     planet.velocity.x = 0.0; planet.velocity.y = 0.0; planet.velocity.z = 0.0;
 
@@ -293,7 +315,7 @@ int main() {
   }
 
   std::ofstream trajectoryFile("orbit.csv");
-  trajectoryFile << "Step,X,Y,Z\n";
+  trajectoryFile << "Step,ParticleID,X,Y,Z\n";
 
   int step = 0;
   while (step < 2360000) {
@@ -307,7 +329,7 @@ int main() {
     baseBoundary.x = 0.0; baseBoundary.y = 0.0;
     baseBoundary.halfDimension = 400000000.0;
 
-    QuadtreeNode root(baseBoundary);
+    OctreeNode root(baseBoundary);
 
     for (int i = 0; i < universe.size(); i++) {
       root.insert(&universe[i]);
