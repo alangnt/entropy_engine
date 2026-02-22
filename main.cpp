@@ -56,6 +56,74 @@ struct QuadtreeNode {
     southWest = nullptr; southEast = nullptr;
   }
 
+  void free() {
+    if (northWest != nullptr) {
+      northWest->free();
+      northEast->free();
+      southWest->free();
+      southEast->free();
+    }
+
+    delete northWest;
+    delete northEast;
+    delete southWest;
+    delete southEast;
+  }
+
+  bool insert(Particle* p) {
+
+    // 1. First we check if the current Quadtree contains the particle
+    if (!boundary.contains(p)) {
+      return false;
+    }
+
+    // 2. Then, we update the Quadtree
+    update(p);
+
+    // 3. We check if no children and no particle first
+    if (northWest == nullptr && particle == nullptr) {
+      particle = p;
+      return true;
+    }
+
+    // 4. We check if no children and particle and push the old particle down
+    if (northWest == nullptr && particle != nullptr) {
+      subdivide();
+      if (northWest->insert(particle)) { /* Success, do nothing else */ }
+      else if (northEast->insert(particle)) { }
+      else if (southWest->insert(particle)) { }
+      else if (southEast->insert(particle)) { }
+      particle = nullptr;
+    }
+
+    // 5. Push the new particle down
+    if (northWest->insert(p)) {
+      return true;
+    }
+    if (northEast->insert(p)) {
+      return true;
+    }
+    if (southWest->insert(p)) {
+      return true;
+    }
+    if (southEast->insert(p)) {
+      return true;
+    }
+
+    if (p == particle) {}
+
+    return false;
+  }
+
+  void update(Particle* p) {
+    // Insert the new particle and calculate new center of mass and total mass
+    centerOfMass.x = ((totalMass * centerOfMass.x) + (p->mass * p->position.x)) / (totalMass + p->mass);
+    centerOfMass.y = ((totalMass * centerOfMass.y) + (p->mass * p->position.y)) / (totalMass + p->mass);
+    centerOfMass.z = ((totalMass * centerOfMass.z) + (p->mass * p->position.z)) / (totalMass + p->mass);
+
+    totalMass = totalMass + p->mass;
+  }
+
   void subdivide() {
     // We cut the size of the box in half for the children
     double newHalf = boundary.halfDimension / 2.0;
@@ -97,6 +165,20 @@ const double GRAVITATIONAL_CONSTANT = 6.67430e-11;
 // Define dt as a constant double
 const double DT = 1.0;
 
+// Theta (MAC ratio)
+const double THETA = 0.5;
+
+double calculateDistance(const Vector3& pA, const Vector3& pB) {
+  double dx = pB.x - pA.x;
+  double dy = pB.y - pA.y;
+  double dz = pB.z - pA.z;
+
+  // d = sqrt(dx^2 + dy^2 + dz^2)
+  double distance = std::sqrt((dx * dx) + (dy * dy) + (dz * dz));
+
+  return distance;
+}
+
 // Passing a const ref to the original memory blocks
 Vector3 calculateGravitationalForceVector(const Particle& pA, const Particle& pB) {
   // 1. Find the difference in each axis
@@ -129,6 +211,53 @@ Vector3 calculateGravitationalForceVector(const Particle& pA, const Particle& pB
   forceVector.z = (dz / distance) * force;
 
   return forceVector;
+}
+
+Vector3 calculateTreeForce(Particle* p, QuadtreeNode* node) {
+  Vector3 totalForce = {0.0, 0.0, 0.0};
+
+  if (node->totalMass == 0.0) {
+    return totalForce;
+  }
+
+  if (node->northWest == nullptr && node->particle != nullptr) {
+    if (p == node->particle) {
+      return totalForce;
+    }
+    return calculateGravitationalForceVector(*p, *(node->particle));
+  }
+
+  if (node->northWest != nullptr) {
+    // find d
+    double distance = calculateDistance(p->position, node->centerOfMass);
+
+    // find s
+    double size = node->boundary.halfDimension * 2;
+    
+    // check if s/d is less than theta (0.5)
+    // if true, far away
+    if (size / distance < THETA) {
+      Particle superParticle;
+      superParticle.position = node->centerOfMass;
+      superParticle.mass = node->totalMass;
+      Vector3 force = calculateGravitationalForceVector(*p, superParticle);
+
+      totalForce = force;
+    } else {
+      Vector3 nwForce = calculateTreeForce(p, node->northWest);
+      Vector3 neForce = calculateTreeForce(p, node->northEast);
+      Vector3 swForce = calculateTreeForce(p, node->southWest);
+      Vector3 seForce = calculateTreeForce(p, node->southEast);
+
+      double totalForceX = nwForce.x + neForce.x + swForce.x + seForce.x;
+      double totalForceY = nwForce.y + neForce.y + swForce.y + seForce.y;
+      double totalForceZ = nwForce.z + neForce.z + swForce.z + seForce.z;
+
+      totalForce = {totalForceX, totalForceY, totalForceZ};
+    }
+  }
+
+  return totalForce;
 }
 
 int main() {
@@ -166,20 +295,22 @@ int main() {
       totalForces[i].x = 0.0; totalForces[i].y = 0.0; totalForces[i].z = 0.0;
     }
 
+    BoundingBox baseBoundary;
+    baseBoundary.x = 0.0; baseBoundary.y = 0.0;
+    baseBoundary.halfDimension = 400000000.0;
+
+    QuadtreeNode root(baseBoundary);
+
     for (int i = 0; i < universe.size(); i++) {
-      for (int j = 0; j < universe.size(); j++) {
-
-        if (i == j) { 
-          continue; 
-        }
-
-        Vector3 force = calculateGravitationalForceVector(universe[i], universe[j]);
-
-        totalForces[i].x = totalForces[i].x + force.x;
-        totalForces[i].y = totalForces[i].y + force.y;
-        totalForces[i].z = totalForces[i].z + force.z;
-      }
+      root.insert(&universe[i]);
     }
+
+    for (int i = 0; i < universe.size(); i++) {
+      totalForces[i] = calculateTreeForce(&universe[i], &root);
+    }
+
+    // free the memory
+    root.free();
 
     for (int i = 0; i < universe.size(); i++) {
             
