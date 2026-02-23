@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <ctime>
 #include <omp.h>
+#include <random>
 
 // Define G as a constant double
 const double GRAVITATIONAL_CONSTANT = 6.67430e-11;
@@ -307,9 +308,15 @@ int main() {
   blackHole.mass = 8.54e36;
   universe.push_back(blackHole);
 
+  std::random_device rd;
+  // Mersenne Twister prime-number
+  std::mt19937 gen(rd());
+  // then we define the Log-Normal probability curve
+  std::lognormal_distribution<double> massDistribution(0.0, 1.0);
 
-  // Generate 10,000 planets
-  for (int i = 0; i < 10000; i++) {
+
+  // Generate 2,000 planets
+  for (int i = 0; i < 2000; i++) {
     Particle planet;
     double randomPositionX = (rand() % 400000000) - 200000000;
     double randomPositionY = (rand() % 400000000) - 200000000;
@@ -318,7 +325,9 @@ int main() {
     planet.position.x = randomPositionX; 
     planet.position.y = randomPositionY;
     planet.position.z = randomPositionZ;
-    planet.mass = 5.972e24;
+
+    double massMultiplier = massDistribution(gen);
+    planet.mass = 5.972e24 * massMultiplier;
 
     // Calculate the exact distance (r) from the Black Hole (0,0,0)
     // Using the Pythagorean theorem: r = sqrt(x^2 + y^2)
@@ -341,7 +350,7 @@ int main() {
   }
 
   std::ofstream trajectoryFile("orbit.csv");
-  trajectoryFile << "Step,ParticleID,X,Y,Z\n";
+  trajectoryFile << "Step,ParticleID,X,Y,Z,Mass\n";
 
   int step = 0;
   while (step < 2360000) {
@@ -395,7 +404,8 @@ int main() {
           << i << "," // 'i' is the ParticleID (0 for Earth, 1 for Moon)
           << universe[i].position.x << "," 
           << universe[i].position.y << "," 
-          << universe[i].position.z << "\n";
+          << universe[i].position.z << ","
+          << universe[i].mass << "\n";
       }  
     }
 
