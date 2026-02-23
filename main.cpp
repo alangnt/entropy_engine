@@ -4,6 +4,7 @@
 #include <vector>
 #include <cstdlib>
 #include <ctime>
+#include <omp.h>
 
 // Define G as a constant double
 const double GRAVITATIONAL_CONSTANT = 6.67430e-11;
@@ -335,6 +336,7 @@ int main() {
       root.insert(&universe[i]);
     }
 
+    #pragma omp parallel for
     for (int i = 0; i < universe.size(); i++) {
       totalForces[i] = calculateTreeForce(&universe[i], &root);
     }
@@ -342,6 +344,7 @@ int main() {
     // free the memory
     root.free();
 
+    #pragma omp parallel for
     for (int i = 0; i < universe.size(); i++) {
             
       // Calculate Acceleration (a = F / m)

@@ -12,4 +12,7 @@ with G = 6.67430e-11
 $$a = \frac{F}{m}$$
 
 ## The to calculate the velocity at an instant t
-$$v_{new} = v_{old} + (a \cdot dt)$$ with dt being the amount of time that has passed since the last calculation
+v_{new} = v_{old} + (a \cdot dt) with dt being the amount of time that has passed since the last calculation
+
+## On MacOS, run this
+```g++ -O3 -Xpreprocessor -fopenmp -I/opt/homebrew/opt/libomp/include -L/opt/homebrew/opt/libomp/lib -lomp main.cpp -o universe```
