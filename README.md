@@ -23,12 +23,18 @@ A softening parameter (`ε = 100,000`) prevents force singularities at close ran
 - **Python 3** with packages listed in `requirements.txt`
 
 ### Compile
+- MacOS
 
 ```bash
 g++ -O3 -Xpreprocessor -fopenmp \
     -I/opt/homebrew/opt/libomp/include \
     -L/opt/homebrew/opt/libomp/lib -lomp \
     main.cpp -o universe
+```
+
+- Linux
+```bash
+g++ -O3 -fopenmp main.cpp -o universe
 ```
 
 ### Run the simulation

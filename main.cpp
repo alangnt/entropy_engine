@@ -299,18 +299,43 @@ int main() {
 
   std::vector<Particle> universe;
 
-  // Generate 1000 planets
-  for (int i = 0; i < 1000; i++) {
+  // Generate our first particle
+  // the "Black Hole"
+  Particle blackHole;
+  blackHole.position.x = 0.0; blackHole.position.y = 0.0; blackHole.position.z = 0.0;
+  blackHole.velocity.x = 0.0; blackHole.velocity.y = 0.0; blackHole.velocity.z = 0.0;
+  blackHole.mass = 8.54e36;
+  universe.push_back(blackHole);
+
+
+  // Generate 10,000 planets
+  for (int i = 0; i < 10000; i++) {
     Particle planet;
-    double randomPositionX = randomDouble(-200000000.0, 200000000.0);
-    double randomPositionY = randomDouble(-200000000.0, 200000000.0);
-    double randomPositionZ = randomDouble(-200000000.0, 200000000.0);
+    double randomPositionX = (rand() % 400000000) - 200000000;
+    double randomPositionY = (rand() % 400000000) - 200000000;
+    double randomPositionZ = (rand() % 40000000) - 20000000;
 
     planet.position.x = randomPositionX; 
     planet.position.y = randomPositionY;
     planet.position.z = randomPositionZ;
     planet.mass = 5.972e24;
-    planet.velocity.x = 0.0; planet.velocity.y = 0.0; planet.velocity.z = 0.0;
+
+    // Calculate the exact distance (r) from the Black Hole (0,0,0)
+    // Using the Pythagorean theorem: r = sqrt(x^2 + y^2)
+    double r = std::sqrt(randomPositionX * randomPositionX + randomPositionY * randomPositionY);
+
+    // Prevent division by zero just in case a planet spawns exactly at 0,0
+    if (r == 0) r = 1.0; 
+
+    // Calculate the exact Orbital Velocity (v)
+    // Formula: v = sqrt((G * M) / r)
+    double blackHoleMass = 8.54e36;
+    double v = std::sqrt((GRAVITATIONAL_CONSTANT * blackHoleMass) / r);
+
+    // Calculate the Tangential Unit Vector (-y/r, x/r) and multiply by v
+    planet.velocity.x = v * (-randomPositionY / r);
+    planet.velocity.y = v * (randomPositionX / r);
+    planet.velocity.z = 0.0; // Keep the disk flat
 
     universe.push_back(planet);
   }

@@ -13,9 +13,12 @@ ax = fig.add_subplot(111, projection='3d')
 bound = 200000000.0
 ax.set_xlim([-bound, bound])
 ax.set_ylim([-bound, bound])
-ax.set_zlim([-bound, bound])
+
+z_bound = 20000000.0
+ax.set_zlim([-z_bound, z_bound])
 
 ax.set_facecolor('black')
+ax.set_box_aspect((1, 1, 0.15))
 fig.patch.set_facecolor('black')
 ax.grid(False)
 ax.axis('off')
