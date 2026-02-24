@@ -7,10 +7,10 @@
 #include <omp.h>
 #include <random>
 
-// Define G as a constant double
+// Define G
 const double GRAVITATIONAL_CONSTANT = 6.67430e-11;
 
-// Define dt as a constant double
+// Define dt
 const double DT = 1.0;
 
 // Theta (MAC ratio)
@@ -18,6 +18,9 @@ const double THETA = 0.5;
 
 // Softening parameter
 const double EPSILON = 100000.0;
+
+// Collision threshold (10,000 km)
+const double COLLISION_RADIUS = 10000000.0;
 
 struct Vector3 {
   double x;
@@ -205,16 +208,16 @@ double calculateDistance(const Vector3& pA, const Vector3& pB) {
 
 // Passing a const ref to the original memory blocks
 Vector3 calculateGravitationalForceVector(const Planet& pA, const Planet& pB) {
-  // 1. Find the difference in each axis
+  // Find the difference in each axis
   double dx = pB.position.x - pA.position.x;
   double dy = pB.position.y - pA.position.y;
   double dz = pB.position.z - pA.position.z;
 
-  // 2. Calculate the distance squared
+  // Calculate the distance squared
   // (no need to square because we need to use r^2 so they cancel each other)
   double distanceSquared = (dx * dx) + (dy * dy) + (dz * dz);
 
-  // 3. Safety check to avoid dividing by zero
+  // Safety check to avoid dividing by zero
   // plus two planets can't be at the exact same point
   if (distanceSquared == 0.0) {
     Vector3 zeroForce;
@@ -224,13 +227,13 @@ Vector3 calculateGravitationalForceVector(const Planet& pA, const Planet& pB) {
 
   double epsilonSquared = EPSILON * EPSILON;
 
-  // 4. Newton's Formula (F = G * (m1 * m2) / r^2)
+  // Newton's Formula (F = G * (m1 * m2) / r^2)
   double force = GRAVITATIONAL_CONSTANT * (pA.mass * pB.mass) / (distanceSquared + epsilonSquared);
 
-  // 5. Find distance between pA and pB
+  // Find distance between pA and pB
   double distance = std::sqrt(distanceSquared);
 
-  // 6. Normalize the vector and multiply by the force magnitude
+  // Normalize the vector and multiply by the force magnitude
   Vector3 forceVector;
   forceVector.x = (dx / distance) * force;
   forceVector.y = (dy / distance) * force;
@@ -396,6 +399,50 @@ int main() {
       universe[i].position.x = universe[i].position.x + (universe[i].velocity.x * DT);
       universe[i].position.y = universe[i].position.y + (universe[i].velocity.y * DT);
       universe[i].position.z = universe[i].position.z + (universe[i].velocity.z * DT);
+    }
+
+    // Accretion physics
+    for (int i = 0; i < universe.size(); i++) {
+      if (!universe[i].isActive) continue;
+
+      for (int j = i + 1; j < universe.size(); j++) {
+        if (!universe[j].isActive) continue;
+
+        // Find the difference in each axis
+        double dx = universe[j].position.x - universe[i].position.x;
+        double dy = universe[j].position.y - universe[i].position.y;
+        double dz = universe[j].position.z - universe[i].position.z;
+
+        // Calculate the distance squared
+        // We square both so we can avoid using a heavy sqrt() on distance
+        double distanceSquared = (dx * dx) + (dy * dy) + (dz * dz);
+        double thresholdSquared = COLLISION_RADIUS * COLLISION_RADIUS;
+
+        // Collision Check
+        if (distanceSquared < thresholdSquared) {
+            
+            Planet& p1 = universe[i];
+            Planet& p2 = universe[j];
+
+            // Conservation of Mass
+            double combinedMass = p1.mass + p2.mass;
+
+            // Conservation of Momentum
+            // v_f = (m1*v1 + m2*v2) / (m1 + m2)
+            double finalVx = (p1.mass * p1.velocity.x + p2.mass * p2.velocity.x) / combinedMass;
+            double finalVy = (p1.mass * p1.velocity.y + p2.mass * p2.velocity.y) / combinedMass;
+            double finalVz = (p1.mass * p1.velocity.z + p2.mass * p2.velocity.z) / combinedMass;
+
+            // Apply the new physics to the surviving planet (p1)
+            p1.velocity.x = finalVx;
+            p1.velocity.y = finalVy;
+            p1.velocity.z = finalVz;
+            p1.mass = combinedMass;
+
+            // Bury the dead planet
+            p2.isActive = false;
+        }
+      }
     }
 
     // Print the position every hour of the simulation time
