@@ -36,9 +36,18 @@ def update(frame_index):
     raw_masses = filtered_df['Mass'].to_numpy()
 
     scaled_masses = np.log10(raw_masses)
+
+    min_mass = np.min(scaled_masses)
+    max_mass = np.max(scaled_masses)
+
+    # value - min / max - min
+    normalized_masses = (scaled_masses - min_mass) / (max_mass - min_mass)
+
+    # translate into real ui pixels
+    final_sizes = (normalized_masses * 150) + 1.0
     
     scatter._offsets3d = (x, y, z)
-    scatter.set_sizes(scaled_masses)
+    scatter.set_sizes(final_sizes)
     
     return scatter,
 

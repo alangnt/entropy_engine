@@ -312,11 +312,11 @@ int main() {
   // Mersenne Twister prime-number
   std::mt19937 gen(rd());
   // then we define the Log-Normal probability curve
-  std::lognormal_distribution<double> massDistribution(0.0, 1.0);
+  std::lognormal_distribution<double> massDistribution(0.0, 3.5);
 
 
   // Generate 2,000 planets
-  for (int i = 0; i < 2000; i++) {
+  for (int i = 0; i < 1000; i++) {
     Particle planet;
     double randomPositionX = (rand() % 400000000) - 200000000;
     double randomPositionY = (rand() % 400000000) - 200000000;
@@ -353,7 +353,7 @@ int main() {
   trajectoryFile << "Step,ParticleID,X,Y,Z,Mass\n";
 
   int step = 0;
-  while (step < 2360000) {
+  while (step < 360000) {
 
     std::vector<Vector3> totalForces(universe.size());
     for (int i = 0; i < totalForces.size(); i++) {
