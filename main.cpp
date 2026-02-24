@@ -25,7 +25,7 @@ struct Vector3 {
   double z;
 };
 
-struct Particle {
+struct Planet {
   Vector3 position;
   Vector3 acceleration;
   Vector3 velocity;
@@ -38,7 +38,7 @@ struct BoundingBox {
   double z;
   double halfDimension;
 
-  bool contains(Particle* p) {
+  bool contains(Planet* p) {
     double rightBoundary = x + halfDimension;
     double leftBoundary = x - halfDimension;
     double topBoundary = y + halfDimension;
@@ -57,7 +57,7 @@ struct BoundingBox {
 
 struct OctreeNode {
   BoundingBox boundary;
-  Particle* particle;
+  Planet* particle;
 
   double totalMass;
   Vector3 centerOfMass;
@@ -93,7 +93,7 @@ struct OctreeNode {
     delete bottomSouthWest; delete bottomSouthEast;
   }
 
-  void update(Particle* p) {
+  void update(Planet* p) {
     // Insert the new particle and calculate new center of mass and total mass
     centerOfMass.x = ((totalMass * centerOfMass.x) + (p->mass * p->position.x)) / (totalMass + p->mass);
     centerOfMass.y = ((totalMass * centerOfMass.y) + (p->mass * p->position.y)) / (totalMass + p->mass);
@@ -102,7 +102,7 @@ struct OctreeNode {
     totalMass = totalMass + p->mass;
   }
 
-  bool insert(Particle* p) {
+  bool insert(Planet* p) {
 
     // 1. First we check if the current Quadtree contains the particle
     if (!boundary.contains(p)) {
@@ -203,7 +203,7 @@ double calculateDistance(const Vector3& pA, const Vector3& pB) {
 }
 
 // Passing a const ref to the original memory blocks
-Vector3 calculateGravitationalForceVector(const Particle& pA, const Particle& pB) {
+Vector3 calculateGravitationalForceVector(const Planet& pA, const Planet& pB) {
   // 1. Find the difference in each axis
   double dx = pB.position.x - pA.position.x;
   double dy = pB.position.y - pA.position.y;
@@ -238,7 +238,7 @@ Vector3 calculateGravitationalForceVector(const Particle& pA, const Particle& pB
   return forceVector;
 }
 
-Vector3 calculateTreeForce(Particle* p, OctreeNode* node) {
+Vector3 calculateTreeForce(Planet* p, OctreeNode* node) {
   Vector3 totalForce = {0.0, 0.0, 0.0};
 
   if (node->totalMass == 0.0) {
@@ -262,10 +262,10 @@ Vector3 calculateTreeForce(Particle* p, OctreeNode* node) {
     // check if s/d is less than theta (0.5)
     // if true, far away
     if (size / distance < THETA) {
-      Particle superParticle;
-      superParticle.position = node->centerOfMass;
-      superParticle.mass = node->totalMass;
-      Vector3 force = calculateGravitationalForceVector(*p, superParticle);
+      Planet superPlanet;
+      superPlanet.position = node->centerOfMass;
+      superPlanet.mass = node->totalMass;
+      Vector3 force = calculateGravitationalForceVector(*p, superPlanet);
 
       totalForce = force;
     } else {
@@ -298,11 +298,11 @@ double randomDouble(double min, double max) {
 int main() {
   srand(time(NULL));
 
-  std::vector<Particle> universe;
+  std::vector<Planet> universe;
 
   // Generate our first particle
   // the "Black Hole"
-  Particle blackHole;
+  Planet blackHole;
   blackHole.position.x = 0.0; blackHole.position.y = 0.0; blackHole.position.z = 0.0;
   blackHole.velocity.x = 0.0; blackHole.velocity.y = 0.0; blackHole.velocity.z = 0.0;
   blackHole.mass = 8.54e36;
@@ -317,7 +317,7 @@ int main() {
 
   // Generate 2,000 planets
   for (int i = 0; i < 1000; i++) {
-    Particle planet;
+    Planet planet;
     double randomPositionX = (rand() % 400000000) - 200000000;
     double randomPositionY = (rand() % 400000000) - 200000000;
     double randomPositionZ = (rand() % 40000000) - 20000000;
@@ -350,7 +350,7 @@ int main() {
   }
 
   std::ofstream trajectoryFile("orbit.csv");
-  trajectoryFile << "Step,ParticleID,X,Y,Z,Mass\n";
+  trajectoryFile << "Step,PlanetID,X,Y,Z,Mass\n";
 
   int step = 0;
   while (step < 2360000) {
@@ -401,7 +401,7 @@ int main() {
     if (step % 3600 == 0) {
       for (int i = 0; i < universe.size(); i++) {
         trajectoryFile << step << "," 
-          << i << "," // 'i' is the ParticleID (0 for Earth, 1 for Moon)
+          << i << ","
           << universe[i].position.x << "," 
           << universe[i].position.y << "," 
           << universe[i].position.z << ","
