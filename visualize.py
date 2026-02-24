@@ -24,7 +24,7 @@ fig.patch.set_facecolor('black')
 ax.grid(False)
 ax.axis('off')
 
-scatter = ax.scatter([], [], [], c='white', marker='o', s=1.5)
+scatter = ax.scatter([], [], [], c=[], cmap='RdYlBu_r', marker='o', s=1.5)
 
 def update(frame_index):
     current_step = df_unique_steps[frame_index]
@@ -48,6 +48,7 @@ def update(frame_index):
     
     scatter._offsets3d = (x, y, z)
     scatter.set_sizes(final_sizes)
+    scatter.set_array(normalized_masses)
     
     return scatter,
 
