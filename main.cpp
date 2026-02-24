@@ -30,6 +30,7 @@ struct Planet {
   Vector3 acceleration;
   Vector3 velocity;
   double mass;
+  bool isActive = true;
 };
 
 struct BoundingBox {
@@ -57,7 +58,7 @@ struct BoundingBox {
 
 struct OctreeNode {
   BoundingBox boundary;
-  Planet* particle;
+  Planet* planet;
 
   double totalMass;
   Vector3 centerOfMass;
@@ -69,7 +70,7 @@ struct OctreeNode {
 
   OctreeNode(BoundingBox b) {
     boundary = b;
-    particle = nullptr;
+    planet = nullptr;
     totalMass = 0.0;
     centerOfMass.x = 0.0; centerOfMass.y = 0.0; centerOfMass.z = 0.0;
 
@@ -94,7 +95,7 @@ struct OctreeNode {
   }
 
   void update(Planet* p) {
-    // Insert the new particle and calculate new center of mass and total mass
+    // Insert the new planet and calculate new center of mass and total mass
     centerOfMass.x = ((totalMass * centerOfMass.x) + (p->mass * p->position.x)) / (totalMass + p->mass);
     centerOfMass.y = ((totalMass * centerOfMass.y) + (p->mass * p->position.y)) / (totalMass + p->mass);
     centerOfMass.z = ((totalMass * centerOfMass.z) + (p->mass * p->position.z)) / (totalMass + p->mass);
@@ -104,7 +105,7 @@ struct OctreeNode {
 
   bool insert(Planet* p) {
 
-    // 1. First we check if the current Quadtree contains the particle
+    // 1. First we check if the current Quadtree contains the planet
     if (!boundary.contains(p)) {
       return false;
     }
@@ -112,27 +113,27 @@ struct OctreeNode {
     // 2. Then, we update the Quadtree
     update(p);
 
-    // 3. We check if no children and no particle first
-    if (topNorthWest == nullptr && particle == nullptr) {
-      particle = p;
+    // 3. We check if no children and no planet first
+    if (topNorthWest == nullptr && planet == nullptr) {
+      planet = p;
       return true;
     }
 
-    // 4. We check if no children and particle and push the old particle down
-    if (topNorthWest == nullptr && particle != nullptr) {
+    // 4. We check if no children and planet and push the old planet down
+    if (topNorthWest == nullptr && planet != nullptr) {
       subdivide();
-      if (topNorthWest->insert(particle)) { /* Success, do nothing else */ }
-      else if (topNorthEast->insert(particle)) { }
-      else if (topSouthWest->insert(particle)) { }
-      else if (topSouthEast->insert(particle)) { }
-      else if (bottomNorthWest->insert(particle)) { }
-      else if (bottomNorthEast->insert(particle)) { }
-      else if (bottomSouthWest->insert(particle)) { }
-      else if (bottomSouthEast->insert(particle)) { }
-      particle = nullptr;
+      if (topNorthWest->insert(planet)) { /* Success, do nothing else */ }
+      else if (topNorthEast->insert(planet)) { }
+      else if (topSouthWest->insert(planet)) { }
+      else if (topSouthEast->insert(planet)) { }
+      else if (bottomNorthWest->insert(planet)) { }
+      else if (bottomNorthEast->insert(planet)) { }
+      else if (bottomSouthWest->insert(planet)) { }
+      else if (bottomSouthEast->insert(planet)) { }
+      planet = nullptr;
     }
 
-    // 5. Push the new particle down
+    // 5. Push the new planet down
     if (topNorthWest->insert(p)) return true;
     if (topNorthEast->insert(p)) return true;
     if (topSouthWest->insert(p)) return true;
@@ -214,7 +215,7 @@ Vector3 calculateGravitationalForceVector(const Planet& pA, const Planet& pB) {
   double distanceSquared = (dx * dx) + (dy * dy) + (dz * dz);
 
   // 3. Safety check to avoid dividing by zero
-  // plus two particles can't be at the exact same point
+  // plus two planets can't be at the exact same point
   if (distanceSquared == 0.0) {
     Vector3 zeroForce;
     zeroForce.x = 0.0; zeroForce.y = 0.0; zeroForce.z = 0.0;
@@ -245,11 +246,11 @@ Vector3 calculateTreeForce(Planet* p, OctreeNode* node) {
     return totalForce;
   }
 
-  if (node->topNorthWest == nullptr && node->particle != nullptr) {
-    if (p == node->particle) {
+  if (node->topNorthWest == nullptr && node->planet != nullptr) {
+    if (p == node->planet) {
       return totalForce;
     }
-    return calculateGravitationalForceVector(*p, *(node->particle));
+    return calculateGravitationalForceVector(*p, *(node->planet));
   }
 
   if (node->topNorthWest != nullptr) {
@@ -300,7 +301,7 @@ int main() {
 
   std::vector<Planet> universe;
 
-  // Generate our first particle
+  // Generate our first object:
   // the "Black Hole"
   Planet blackHole;
   blackHole.position.x = 0.0; blackHole.position.y = 0.0; blackHole.position.z = 0.0;
