@@ -353,7 +353,7 @@ int main() {
   trajectoryFile << "Step,ParticleID,X,Y,Z,Mass\n";
 
   int step = 0;
-  while (step < 360000) {
+  while (step < 2360000) {
 
     std::vector<Vector3> totalForces(universe.size());
     for (int i = 0; i < totalForces.size(); i++) {
