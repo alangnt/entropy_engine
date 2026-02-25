@@ -10,17 +10,14 @@
 // Define G
 const double GRAVITATIONAL_CONSTANT = 6.67430e-11;
 
-// Define dt
-const double DT = 1.0;
+// Define dt - 1 day
+const double DT = 86400.0;
 
 // Theta (MAC ratio)
 const double THETA = 0.5;
 
 // Softening parameter
-const double EPSILON = 100000.0;
-
-// Collision threshold (10,000 km)
-const double COLLISION_RADIUS = 10000000.0;
+const double EPSILON = 10.0;
 
 struct Vector3 {
   double x;
@@ -33,6 +30,7 @@ struct Planet {
   Vector3 acceleration;
   Vector3 velocity;
   double mass;
+  double density;
   bool isActive = true;
 };
 
@@ -299,6 +297,12 @@ double randomDouble(double min, double max) {
   return min + fraction * (max - min);
 }
 
+double getDensity(double mass) {
+  if (mass < 1e26) return 5000.0;   // rocky
+  if (mass < 1e28) return 1300.0;   // gas giant
+  return 1400.0;                    // stellar
+}
+
 int main() {
   srand(time(NULL));
 
@@ -319,12 +323,12 @@ int main() {
   std::lognormal_distribution<double> massDistribution(0.0, 3.5);
 
 
-  // Generate 2,000 planets
+  // Generate 1,000 planets
   for (int i = 0; i < 1000; i++) {
     Planet planet;
     double randomPositionX = (rand() % 400000000) - 200000000;
     double randomPositionY = (rand() % 400000000) - 200000000;
-    double randomPositionZ = (rand() % 40000000) - 20000000;
+    double randomPositionZ = (rand() % 400000000) - 200000000;
 
     planet.position.x = randomPositionX; 
     planet.position.y = randomPositionY;
@@ -333,9 +337,11 @@ int main() {
     double massMultiplier = massDistribution(gen);
     planet.mass = 5.972e24 * massMultiplier;
 
+    planet.density = getDensity(planet.mass);
+
     // Calculate the exact distance (r) from the Black Hole (0,0,0)
-    // Using the Pythagorean theorem: r = sqrt(x^2 + y^2)
-    double r = std::sqrt(randomPositionX * randomPositionX + randomPositionY * randomPositionY);
+    // Using the Pythagorean theorem: r = sqrt(x^2 + y^2 + z^2)
+    double r = std::sqrt(randomPositionX * randomPositionX + randomPositionY * randomPositionY + randomPositionZ * randomPositionZ);
 
     // Prevent division by zero just in case a planet spawns exactly at 0,0
     if (r == 0) r = 1.0; 
@@ -357,7 +363,7 @@ int main() {
   trajectoryFile << "Step,PlanetID,X,Y,Z,Mass\n";
 
   int step = 0;
-  while (step < 2360000) {
+  while (step < 360000) {
 
     std::vector<Vector3> totalForces(universe.size());
     for (int i = 0; i < totalForces.size(); i++) {
@@ -365,17 +371,19 @@ int main() {
     }
 
     BoundingBox baseBoundary;
-    baseBoundary.x = 0.0; baseBoundary.y = 0.0;
+    baseBoundary.x = 0.0; baseBoundary.y = 0.0; baseBoundary.z = 0.0;
     baseBoundary.halfDimension = 400000000.0;
 
     OctreeNode root(baseBoundary);
 
     for (int i = 0; i < universe.size(); i++) {
+      if (!universe[i].isActive) continue;
       root.insert(&universe[i]);
     }
 
     #pragma omp parallel for
     for (int i = 0; i < universe.size(); i++) {
+      if (!universe[i].isActive) continue;
       totalForces[i] = calculateTreeForce(&universe[i], &root);
     }
 
@@ -384,6 +392,7 @@ int main() {
 
     #pragma omp parallel for
     for (int i = 0; i < universe.size(); i++) {
+      if (!universe[i].isActive) continue;
             
       // Calculate Acceleration (a = F / m)
       double accelX = totalForces[i].x / universe[i].mass;
@@ -408,39 +417,42 @@ int main() {
       for (int j = i + 1; j < universe.size(); j++) {
         if (!universe[j].isActive) continue;
 
+        Planet& p1 = universe[i];
+        Planet& p2 = universe[j];
+
         // Find the difference in each axis
-        double dx = universe[j].position.x - universe[i].position.x;
-        double dy = universe[j].position.y - universe[i].position.y;
-        double dz = universe[j].position.z - universe[i].position.z;
+        double dx = p2.position.x - p1.position.x;
+        double dy = p2.position.y - p1.position.y;
+        double dz = p2.position.z - p1.position.z;
 
         // Calculate the distance squared
         // We square both so we can avoid using a heavy sqrt() on distance
         double distanceSquared = (dx * dx) + (dy * dy) + (dz * dz);
-        double thresholdSquared = COLLISION_RADIUS * COLLISION_RADIUS;
+        double r1 = std::cbrt(3.0 * p1.mass / (4.0 * M_PI * p1.density));
+        double r2 = std::cbrt(3.0 * p2.mass / (4.0 * M_PI * p2.density));
+        double thresholdSquared = (r1 + r2) * (r1 + r2);
 
         // Collision Check
         if (distanceSquared < thresholdSquared) {
-            
-            Planet& p1 = universe[i];
-            Planet& p2 = universe[j];
 
-            // Conservation of Mass
-            double combinedMass = p1.mass + p2.mass;
+          // Conservation of Mass
+          double combinedMass = p1.mass + p2.mass;
 
-            // Conservation of Momentum
-            // v_f = (m1*v1 + m2*v2) / (m1 + m2)
-            double finalVx = (p1.mass * p1.velocity.x + p2.mass * p2.velocity.x) / combinedMass;
-            double finalVy = (p1.mass * p1.velocity.y + p2.mass * p2.velocity.y) / combinedMass;
-            double finalVz = (p1.mass * p1.velocity.z + p2.mass * p2.velocity.z) / combinedMass;
+          // Conservation of Momentum
+          // v_f = (m1*v1 + m2*v2) / (m1 + m2)
+          double finalVx = (p1.mass * p1.velocity.x + p2.mass * p2.velocity.x) / combinedMass;
+          double finalVy = (p1.mass * p1.velocity.y + p2.mass * p2.velocity.y) / combinedMass;
+          double finalVz = (p1.mass * p1.velocity.z + p2.mass * p2.velocity.z) / combinedMass;
 
-            // Apply the new physics to the surviving planet (p1)
-            p1.velocity.x = finalVx;
-            p1.velocity.y = finalVy;
-            p1.velocity.z = finalVz;
-            p1.mass = combinedMass;
+          // Apply the new physics to the surviving planet (p1)
+          p1.velocity.x = finalVx;
+          p1.velocity.y = finalVy;
+          p1.velocity.z = finalVz;
+          p1.mass = combinedMass;
+          p1.density = getDensity(combinedMass);
 
-            // Bury the dead planet
-            p2.isActive = false;
+          // Bury the dead planet
+          p2.isActive = false;
         }
       }
     }
@@ -454,7 +466,7 @@ int main() {
           << universe[i].position.y << "," 
           << universe[i].position.z << ","
           << universe[i].mass << "\n";
-      }  
+      }
     }
 
     step++;
