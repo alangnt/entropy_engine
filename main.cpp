@@ -366,7 +366,7 @@ int main() {
   while (step < 360000) {
 
     std::vector<Vector3> totalForces(universe.size());
-    for (int i = 0; i < totalForces.size(); i++) {
+    for (size_t i = 0; i < totalForces.size(); i++) {
       totalForces[i].x = 0.0; totalForces[i].y = 0.0; totalForces[i].z = 0.0;
     }
 
@@ -376,13 +376,13 @@ int main() {
 
     OctreeNode root(baseBoundary);
 
-    for (int i = 0; i < universe.size(); i++) {
+    for (size_t i = 0; i < universe.size(); i++) {
       if (!universe[i].isActive) continue;
       root.insert(&universe[i]);
     }
 
     #pragma omp parallel for
-    for (int i = 0; i < universe.size(); i++) {
+    for (size_t i = 0; i < universe.size(); i++) {
       if (!universe[i].isActive) continue;
       totalForces[i] = calculateTreeForce(&universe[i], &root);
     }
@@ -391,7 +391,7 @@ int main() {
     root.free();
 
     #pragma omp parallel for
-    for (int i = 0; i < universe.size(); i++) {
+    for (size_t i = 0; i < universe.size(); i++) {
       if (!universe[i].isActive) continue;
             
       // Calculate Acceleration (a = F / m)
@@ -411,10 +411,10 @@ int main() {
     }
 
     // Accretion physics
-    for (int i = 0; i < universe.size(); i++) {
+    for (size_t i = 0; i < universe.size(); i++) {
       if (!universe[i].isActive) continue;
 
-      for (int j = i + 1; j < universe.size(); j++) {
+      for (size_t j = i + 1; j < universe.size(); j++) {
         if (!universe[j].isActive) continue;
 
         Planet& p1 = universe[i];
@@ -459,7 +459,7 @@ int main() {
 
     // Print the position every hour of the simulation time
     if (step % 3600 == 0) {
-      for (int i = 0; i < universe.size(); i++) {
+      for (size_t i = 0; i < universe.size(); i++) {
         trajectoryFile << step << "," 
           << i << ","
           << universe[i].position.x << "," 
