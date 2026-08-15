@@ -1,4 +1,4 @@
-# Entropy Engine
+# Entropy Cosmos
 
 A 3D N-Body gravitational simulation that models the orbital dynamics of 1000 celestial bodies using the **Barnes-Hut algorithm** for efficient O(N log N) force computation, with OpenMP multithreading and real-time 3D visualization.
 
